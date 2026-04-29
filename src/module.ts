@@ -1,4 +1,6 @@
+import { type ModuleInterface, ModuleType } from '@creit.tech/stellar-wallets-kit';
 import { MetaMaskStellarAdapter } from './adapter.js';
+import { metamaskIcon } from './icon.js';
 
 /**
  * The unique product ID for the MetaMask module in the Stellar Wallets Kit.
@@ -26,14 +28,13 @@ export const METAMASK_ID = 'metamask';
  *   selectedWalletId: METAMASK_ID,
  * });
  */
-export class MetaMaskModule {
-  /** Wallet category — matches `ModuleType.HOT_WALLET` from `@creit-tech/stellar-wallets-kit`. */
-  readonly moduleType = 'HOT_WALLET' as const;
+export class MetaMaskModule implements ModuleInterface {
+  readonly moduleType = ModuleType.HOT_WALLET;
   readonly productId = METAMASK_ID;
   readonly productName = 'MetaMask';
   readonly productUrl = 'https://metamask.io';
-  readonly productIcon =
-    'https://raw.githubusercontent.com/MetaMask/brand-resources/main/SVG/svg-512/metamask-fox.svg';
+  // readonly productIcon = 'https://raw.githubusercontent.com/MetaMask/brand-resources/main/SVG/svg-512/metamask-fox.svg';
+  readonly productIcon = metamaskIcon;
 
   /** Underlying SEP-0043 adapter instance — shared across all kit method calls. */
   readonly adapter = new MetaMaskStellarAdapter();
@@ -173,14 +174,21 @@ export class MetaMaskModule {
    * @param callback - Function called with the new address, network name, and network passphrase on each change.
    */
   onChange(
-    callback: (event: { address: string; network: string; networkPassphrase: string; error?: unknown }) => void,
+    callback: (event: {
+      address: string;
+      network: string;
+      networkPassphrase: string;
+      error?: { code: number; message: string };
+    }) => void,
   ): void {
     this.adapter.on('accountsChanged', (data) => {
       const address = data as string;
       this.adapter
         .getNetwork()
         .then(({ network, networkPassphrase }) => callback({ address, network, networkPassphrase }))
-        .catch(console.warn);
+        .catch((error) =>
+          callback({ address: '', network: '', networkPassphrase: '', error: { code: -1, message: error.message } }),
+        );
     });
   }
 }

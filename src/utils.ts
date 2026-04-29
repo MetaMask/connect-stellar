@@ -1,4 +1,4 @@
-import { NETWORK_PASSPHRASE, Scope } from './types.js';
+import { NETWORK_PASSPHRASE, type Scope } from './types.js';
 
 /**
  * Extracts the Stellar address from a CAIP-10 account ID.
@@ -13,7 +13,9 @@ import { NETWORK_PASSPHRASE, Scope } from './types.js';
  */
 export function getAddressFromCaipAccountId(caipAccountId: string): string {
   const [, , address] = caipAccountId.split(':');
-  if (!address) throw new Error(`Invalid CAIP account ID: ${caipAccountId}`);
+  if (!address) {
+    throw new Error(`Invalid CAIP account ID: ${caipAccountId}`);
+  }
   return address;
 }
 
