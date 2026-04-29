@@ -1,0 +1,70 @@
+import type { RpcMethod } from '@metamask/multichain-api-client';
+
+/**
+ * Stellar CAIP-2 network scopes.
+ * Based on CAIP-104: https://github.com/ChainAgnostic/namespaces/blob/main/stellar/caip2.md
+ *
+ * NOTE: Confirm these scope values with the MetaMask Stellar snap team before finalizing.
+ */
+export enum Scope {
+  PUBNET = 'stellar:pubnet',
+}
+
+/**
+ * RPC API definition for the Stellar MetaMask snap.
+ * Passed to `MultichainApiClient.extendsRpcApi<StellarRpc>()` to obtain a fully typed client
+ * that constrains `invokeMethod` calls to the three Stellar signing methods below.
+ *
+ * Each method follows the SEP-0043 request/response shape.
+ */
+export type StellarRpc = {
+  stellar: {
+    methods: {
+      /** Signs a transaction envelope XDR and returns the signed XDR together with the signer address. */
+      signTransaction: RpcMethod<
+        { xdr: string; networkPassphrase: string; address: string | null },
+        { signedTxXdr: string; signerAddress: string }
+      >;
+      /** Signs a Soroban `SorobanAuthorizationEntry` XDR and returns the signed entry with the signer address. */
+      signAuthEntry: RpcMethod<
+        { authEntry: string; networkPassphrase: string; address: string | null },
+        { signedAuthEntry: string | null; signerAddress: string }
+      >;
+      /** Signs an arbitrary UTF-8 message and returns the base64-encoded signature with the signer address. */
+      signMessage: RpcMethod<
+        { message: string; networkPassphrase: string; address: string | null },
+        { signedMessage: string; signerAddress: string }
+      >;
+    };
+    events: [];
+  };
+};
+
+/**
+ * Official SEP-0043 network passphrases keyed by `Scope`.
+ * Used to populate the `networkPassphrase` field in RPC calls and to resolve scopes from passphrases.
+ */
+export const NETWORK_PASSPHRASE: Record<Scope, string> = {
+  [Scope.PUBNET]: 'Public Global Stellar Network ; September 2015',
+};
+
+/**
+ * Human-readable network names keyed by `Scope`.
+ * Matches the values expected by the Stellar Wallets Kit `getNetwork()` contract.
+ */
+export const NETWORK_NAME: Record<Scope, string> = {
+  [Scope.PUBNET]: 'PUBLIC',
+};
+
+/**
+ * Normalised error object returned by all SEP-0043 adapter methods.
+ * Mirrors the Stellar Wallets Kit error shape so callers can handle errors uniformly.
+ */
+export interface StellarAdapterError {
+  /** Human-readable description of the error. */
+  message: string;
+  /** Numeric error code; `-1` for generic errors, `-3` for not-connected errors. */
+  code: number;
+  /** Optional extended error context (e.g. from the MetaMask RPC layer). */
+  ext?: string[];
+}
