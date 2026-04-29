@@ -1,6 +1,6 @@
 {
   "name": "@metamask/connect-stellar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "ISC",
   "description": "The MetaMask Connect Stellar adapter",
   "homepage": "https://github.com/MetaMask/connect-stellar#readme",
