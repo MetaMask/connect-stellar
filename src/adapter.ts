@@ -8,11 +8,7 @@ import {
 } from '@metamask/multichain-api-client';
 import { metamaskIcon } from './icon.js';
 import { NETWORK_NAME, NETWORK_PASSPHRASE, Scope, type StellarAdapterError, type StellarRpc } from './types.js';
-import {
-  getAddressFromCaipAccountId,
-  isSessionChangedEvent,
-  networkPassphraseToScope,
-} from './utils.js';
+import { getAddressFromCaipAccountId, isSessionChangedEvent, networkPassphraseToScope } from './utils.js';
 
 import type { MultichainApiClient } from '@metamask/multichain-api-client';
 
@@ -142,9 +138,7 @@ export class MetaMaskStellarAdapter {
    *
    * @returns The human-readable network name and its SEP-0043 passphrase, or an error with code `-3` if not connected.
    */
-  async getNetwork(): Promise<
-    { network: string; networkPassphrase: string } & { error?: StellarAdapterError }
-  > {
+  async getNetwork(): Promise<{ network: string; networkPassphrase: string } & { error?: StellarAdapterError }> {
     if (!this._scope) {
       return {
         network: '',
@@ -167,10 +161,7 @@ export class MetaMaskStellarAdapter {
   async isAllowed(): Promise<{ isAllowed: boolean } & { error?: StellarAdapterError }> {
     try {
       const session = await this._client.getSession();
-      const isAllowed = !!(
-        session &&
-        Object.keys(session.sessionScopes).some((scope) => scope.startsWith('stellar:'))
-      );
+      const isAllowed = !!(session && Object.keys(session.sessionScopes).some((scope) => scope.startsWith('stellar:')));
       return { isAllowed };
     } catch (e: unknown) {
       return { isAllowed: false, error: toAdapterError(e) };
@@ -243,9 +234,7 @@ export class MetaMaskStellarAdapter {
   async signAuthEntry(
     authEntry: string,
     opts?: { networkPassphrase?: string; address?: string },
-  ): Promise<
-    { signedAuthEntry: string | null; signerAddress: string } & { error?: StellarAdapterError }
-  > {
+  ): Promise<{ signedAuthEntry: string | null; signerAddress: string } & { error?: StellarAdapterError }> {
     try {
       const scope = this.resolveScopeForCall(opts?.networkPassphrase);
       await this.ensureScopeInSession(scope);
@@ -282,9 +271,7 @@ export class MetaMaskStellarAdapter {
   async signMessage(
     message: string,
     opts?: { networkPassphrase?: string; address?: string },
-  ): Promise<
-    { signedMessage: string; signerAddress: string } & { error?: StellarAdapterError }
-  > {
+  ): Promise<{ signedMessage: string; signerAddress: string } & { error?: StellarAdapterError }> {
     try {
       const scope = this.resolveScopeForCall(opts?.networkPassphrase);
       await this.ensureScopeInSession(scope);
@@ -332,7 +319,9 @@ export class MetaMaskStellarAdapter {
    * @param listener - Callback invoked with the event payload.
    */
   on(event: string, listener: (data: unknown) => void): void {
-    if (!this._listeners.has(event)) this._listeners.set(event, new Set());
+    if (!this._listeners.has(event)) {
+      this._listeners.set(event, new Set());
+    }
     this._listeners.get(event)!.add(listener);
   }
 
@@ -353,7 +342,9 @@ export class MetaMaskStellarAdapter {
    * @param data - Arbitrary payload forwarded to each listener.
    */
   private emit(event: string, data: unknown): void {
-    this._listeners.get(event)?.forEach((listener) => listener(data));
+    for (const listener of this._listeners.get(event) ?? []) {
+      listener(data);
+    }
   }
 
   /**
@@ -371,10 +362,10 @@ export class MetaMaskStellarAdapter {
    * listener after a `disconnect()` cycle.
    */
   private startSessionListener(): void {
-    if (this._removeSessionChangedListener) return;
-    this._removeSessionChangedListener = this._client.onNotification(
-      this.handleSessionChangedEvent.bind(this),
-    );
+    if (this._removeSessionChangedListener) {
+      return;
+    }
+    this._removeSessionChangedListener = this._client.onNotification(this.handleSessionChangedEvent.bind(this));
   }
 
   /**
@@ -404,10 +395,7 @@ export class MetaMaskStellarAdapter {
   private async ensureScopeInSession(scope: Scope): Promise<void> {
     const session = await this._client.getSession();
     const hasScope =
-      this._address &&
-      session?.sessionScopes[scope]?.accounts?.some((acc) =>
-        acc.includes(this._address as string),
-      );
+      this._address && session?.sessionScopes[scope]?.accounts?.some((acc) => acc.includes(this._address as string));
     if (!hasScope) {
       await this.createSession(scope, this._address ? [this._address] : undefined);
     }
@@ -420,7 +408,9 @@ export class MetaMaskStellarAdapter {
   private async tryRestoringSession(): Promise<void> {
     try {
       const existingSession = await this._client.getSession();
-      if (!existingSession) return;
+      if (!existingSession) {
+        return;
+      }
       const scope = this.restoreScope();
       this.updateSession(existingSession, scope);
     } catch (error) {
@@ -440,9 +430,7 @@ export class MetaMaskStellarAdapter {
     const session = await this._client.createSession({
       optionalScopes: {
         [scope]: {
-          accounts: (
-            addresses ? addresses.map((addr) => `${scope}:${addr}` as CaipAccountId) : []
-          ),
+          accounts: addresses ? addresses.map((addr) => `${scope}:${addr}` as CaipAccountId) : [],
           methods: [],
           notifications: [],
         },
@@ -474,10 +462,7 @@ export class MetaMaskStellarAdapter {
     }
 
     let addressToConnect: string;
-    if (
-      this._address &&
-      scopeAccounts.includes(`${scope}:${this._address}` as CaipAccountId)
-    ) {
+    if (this._address && scopeAccounts.includes(`${scope}:${this._address}` as CaipAccountId)) {
       addressToConnect = this._address;
     } else {
       addressToConnect = getAddressFromCaipAccountId(scopeAccounts[0]);
@@ -494,10 +479,7 @@ export class MetaMaskStellarAdapter {
    * @param session - The MetaMask session to inspect for available scopes.
    * @returns `Scope.PUBNET` when present in the session, or `undefined`.
    */
-  private selectScopeWithPriority(
-    session: SessionData,
-    _preferredScope?: Scope,
-  ): Scope | undefined {
+  private selectScopeWithPriority(session: SessionData, _preferredScope?: Scope): Scope | undefined {
     const available = new Set(Object.keys(session?.sessionScopes ?? {}));
     return available.has(Scope.PUBNET) ? Scope.PUBNET : undefined;
   }
@@ -512,7 +494,9 @@ export class MetaMaskStellarAdapter {
     if (this._address !== address) {
       this._connected = !!address;
       this._address = address;
-      if (address) this.emit('accountsChanged', address);
+      if (address) {
+        this.emit('accountsChanged', address);
+      }
     }
   }
 
@@ -558,7 +542,9 @@ export class MetaMaskStellarAdapter {
    * @param data - Raw notification payload from the MetaMask multichain client.
    */
   private async handleSessionChangedEvent(data: unknown): Promise<void> {
-    if (!isSessionChangedEvent(data)) return;
+    if (!isSessionChangedEvent(data)) {
+      return;
+    }
 
     const session = (data as { params?: SessionData })?.params;
     if (!session) {
@@ -587,11 +573,13 @@ export class MetaMaskStellarAdapter {
  * @returns A normalised `StellarAdapterError` with a numeric code and message string.
  */
 function toAdapterError(e: unknown): StellarAdapterError {
-  if (e instanceof Error) return { code: -1, message: e.message };
+  if (e instanceof Error) {
+    return { code: -1, message: e.message };
+  }
   if (typeof e === 'object' && e !== null && 'message' in e) {
     const obj = e as Record<string, unknown>;
-    const code = typeof obj['code'] === 'number' ? (obj['code'] as number) : -1;
-    return { code, message: String(obj['message']) };
+    const code = typeof obj.code === 'number' ? (obj.code as number) : -1;
+    return { code, message: String(obj.message) };
   }
   return { code: -1, message: String(e) };
 }

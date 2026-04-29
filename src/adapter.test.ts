@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Scope, NETWORK_PASSPHRASE, NETWORK_NAME } from './types.js';
+import { NETWORK_NAME, NETWORK_PASSPHRASE, Scope } from './types.js';
 
 // --- Mocks ---
 
 const TEST_ADDRESS = 'GABC2DEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUV';
-const TEST_CAIP_ACCOUNT = `stellar:pubnet:${TEST_ADDRESS}` as const;
+const _TEST_CAIP_ACCOUNT = `stellar:pubnet:${TEST_ADDRESS}` as const;
 
 const mockRemoveListener = vi.fn();
 const mockClient = {
@@ -30,9 +30,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
   };
 })();
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });

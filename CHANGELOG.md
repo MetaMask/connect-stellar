@@ -15,4 +15,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sessionChanged` event handling for real-time sync with MetaMask
 - Exported SEP-0043 primitives (`Scope`, `NETWORK_PASSPHRASE`, `NETWORK_NAME`) for direct multichain API usage
 
-[Unreleased]: https://github.com/MetaMask/connect-stellar/commits/HEAD
+[Unreleased]: https://github.com/MetaMask/connect-stellar/

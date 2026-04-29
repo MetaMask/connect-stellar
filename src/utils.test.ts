@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAddressFromCaipAccountId, isSessionChangedEvent, networkPassphraseToScope } from './utils.js';
 import { Scope } from './types.js';
+import { getAddressFromCaipAccountId, isSessionChangedEvent, networkPassphraseToScope } from './utils.js';
 
 describe('getAddressFromCaipAccountId', () => {
   it('extracts the address from a valid CAIP-10 account ID', () => {
@@ -10,24 +10,18 @@ describe('getAddressFromCaipAccountId', () => {
   });
 
   it('throws on an invalid CAIP account ID with no address segment', () => {
-    expect(() => getAddressFromCaipAccountId('stellar:pubnet')).toThrow(
-      'Invalid CAIP account ID',
-    );
+    expect(() => getAddressFromCaipAccountId('stellar:pubnet')).toThrow('Invalid CAIP account ID');
   });
 });
 
 describe('networkPassphraseToScope', () => {
   it('returns PUBNET scope for the mainnet passphrase', () => {
-    const scope = networkPassphraseToScope(
-      'Public Global Stellar Network ; September 2015',
-    );
+    const scope = networkPassphraseToScope('Public Global Stellar Network ; September 2015');
     expect(scope).toBe(Scope.PUBNET);
   });
 
   it('throws for an unknown passphrase', () => {
-    expect(() => networkPassphraseToScope('Test SDF Network ; September 2015')).toThrow(
-      'Unknown network passphrase',
-    );
+    expect(() => networkPassphraseToScope('Test SDF Network ; September 2015')).toThrow('Unknown network passphrase');
   });
 });
 

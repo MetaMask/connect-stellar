@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Scope, NETWORK_NAME, NETWORK_PASSPHRASE } from './types.js';
+import { NETWORK_NAME, NETWORK_PASSPHRASE, Scope } from './types.js';
 
 const TEST_ADDRESS = 'GABC2DEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUV';
 
@@ -42,7 +42,7 @@ Object.defineProperty(globalThis, 'localStorage', {
   },
 });
 
-import { MetaMaskModule, METAMASK_ID } from './module.js';
+import { METAMASK_ID, MetaMaskModule } from './module.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
