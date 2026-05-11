@@ -10,6 +10,16 @@ export enum Scope {
   PUBNET = 'stellar:pubnet',
 }
 
+export const STELLAR_SIGNING_METHODS = ['signMessage', 'signTransaction', 'signAuthEntry'] as const;
+
+/**
+ * SEP-0043 signing options shared by message, transaction, and auth-entry signing.
+ */
+export type Sep43SignOptions = {
+  networkPassphrase?: string;
+  address?: string | null;
+};
+
 /**
  * RPC API definition for the Stellar MetaMask snap.
  * Passed to `MultichainApiClient.extendsRpcApi<StellarRpc>()` to obtain a fully typed client
@@ -22,17 +32,17 @@ export type StellarRpc = {
     methods: {
       /** Signs a transaction envelope XDR and returns the signed XDR together with the signer address. */
       signTransaction: RpcMethod<
-        { xdr: string; networkPassphrase: string; address: string | null },
+        { xdr: string; opts?: Sep43SignOptions },
         { signedTxXdr: string; signerAddress: string }
       >;
       /** Signs a Soroban `SorobanAuthorizationEntry` XDR and returns the signed entry with the signer address. */
       signAuthEntry: RpcMethod<
-        { authEntry: string; networkPassphrase: string; address: string | null },
+        { authEntry: string; opts?: Sep43SignOptions },
         { signedAuthEntry: string | null; signerAddress: string }
       >;
       /** Signs an arbitrary UTF-8 message and returns the base64-encoded signature with the signer address. */
       signMessage: RpcMethod<
-        { message: string; networkPassphrase: string; address: string | null },
+        { message: string; opts?: Sep43SignOptions },
         { signedMessage: string; signerAddress: string }
       >;
     };
