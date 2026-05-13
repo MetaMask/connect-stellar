@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NETWORK_NAME, NETWORK_PASSPHRASE, Scope } from './types.js';
+import { NETWORK_NAME, NETWORK_PASSPHRASE, STELLAR_SIGNING_METHODS, Scope } from './types.js';
 
 // --- Mocks ---
 
@@ -48,6 +48,8 @@ function pubnetSession(address: string = TEST_ADDRESS) {
     sessionScopes: {
       [Scope.PUBNET]: {
         accounts: [`stellar:pubnet:${address}`],
+        methods: [...STELLAR_SIGNING_METHODS],
+        notifications: [],
       },
     },
   };
@@ -109,7 +111,15 @@ describe('MetaMaskStellarAdapter', () => {
 
       expect(result.address).toBe(TEST_ADDRESS);
       expect(result.error).toBeUndefined();
-      expect(mockClient.createSession).toHaveBeenCalled();
+      expect(mockClient.createSession).toHaveBeenCalledWith({
+        optionalScopes: {
+          [Scope.PUBNET]: {
+            accounts: [],
+            methods: [...STELLAR_SIGNING_METHODS],
+            notifications: [],
+          },
+        },
+      });
     });
 
     it('skips createSession if already connected from restore', async () => {
@@ -279,6 +289,19 @@ describe('MetaMaskStellarAdapter', () => {
       expect(result.signedTxXdr).toBe('signed-xdr');
       expect(result.signerAddress).toBe(TEST_ADDRESS);
       expect(result.error).toBeUndefined();
+      expect(mockClient.invokeMethod).toHaveBeenCalledWith({
+        scope: Scope.PUBNET,
+        request: {
+          method: 'signTransaction',
+          params: {
+            xdr: 'some-xdr',
+            opts: {
+              networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
+              address: TEST_ADDRESS,
+            },
+          },
+        },
+      });
     });
 
     it('returns error when submit option is provided', async () => {
@@ -319,6 +342,19 @@ describe('MetaMaskStellarAdapter', () => {
       const result = await adapter.signAuthEntry('auth-entry-xdr');
       expect(result.signedAuthEntry).toBe('signed-auth');
       expect(result.signerAddress).toBe(TEST_ADDRESS);
+      expect(mockClient.invokeMethod).toHaveBeenCalledWith({
+        scope: Scope.PUBNET,
+        request: {
+          method: 'signAuthEntry',
+          params: {
+            authEntry: 'auth-entry-xdr',
+            opts: {
+              networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
+              address: TEST_ADDRESS,
+            },
+          },
+        },
+      });
     });
 
     it('returns error when not connected', async () => {
@@ -341,6 +377,19 @@ describe('MetaMaskStellarAdapter', () => {
       const result = await adapter.signMessage('Hello Stellar');
       expect(result.signedMessage).toBe('signed-msg');
       expect(result.signerAddress).toBe(TEST_ADDRESS);
+      expect(mockClient.invokeMethod).toHaveBeenCalledWith({
+        scope: Scope.PUBNET,
+        request: {
+          method: 'signMessage',
+          params: {
+            message: 'Hello Stellar',
+            opts: {
+              networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
+              address: TEST_ADDRESS,
+            },
+          },
+        },
+      });
     });
 
     it('returns error when not connected', async () => {

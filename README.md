@@ -65,7 +65,11 @@ const client = getMultichainClient({ transport }).extendsRpcApi<StellarRpc>();
 // Create a session on PUBNET
 const session = await client.createSession({
   optionalScopes: {
-    [Scope.PUBNET]: { accounts: [], methods: [], notifications: [] },
+    [Scope.PUBNET]: {
+      accounts: [],
+      methods: ['signMessage', 'signTransaction', 'signAuthEntry'],
+      notifications: [],
+    },
   },
 });
 
@@ -80,8 +84,10 @@ const result = await client.invokeMethod({
     method: 'signTransaction',
     params: {
       xdr,
-      networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
-      address,
+      opts: {
+        networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
+        address,
+      },
     },
   },
 });

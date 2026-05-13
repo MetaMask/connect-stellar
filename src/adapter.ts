@@ -7,7 +7,15 @@ import {
   isMetamaskInstalled,
 } from '@metamask/multichain-api-client';
 import { metamaskIcon } from './icon.js';
-import { NETWORK_NAME, NETWORK_PASSPHRASE, Scope, type StellarAdapterError, type StellarRpc } from './types.js';
+import {
+  NETWORK_NAME,
+  NETWORK_PASSPHRASE,
+  STELLAR_SIGNING_METHODS,
+  Scope,
+  type Sep43SignOptions,
+  type StellarAdapterError,
+  type StellarRpc,
+} from './types.js';
 import { getAddressFromCaipAccountId, isSessionChangedEvent, networkPassphraseToScope } from './utils.js';
 
 import type { MultichainApiClient } from '@metamask/multichain-api-client';
@@ -208,8 +216,7 @@ export class MetaMaskStellarAdapter {
           method: 'signTransaction',
           params: {
             xdr,
-            networkPassphrase: opts?.networkPassphrase ?? NETWORK_PASSPHRASE[scope],
-            address: opts?.address ?? this._address,
+            opts: this.getSep43SignOptions(scope, opts),
           },
         },
       });
@@ -245,8 +252,7 @@ export class MetaMaskStellarAdapter {
           method: 'signAuthEntry',
           params: {
             authEntry,
-            networkPassphrase: opts?.networkPassphrase ?? NETWORK_PASSPHRASE[scope],
-            address: opts?.address ?? this._address,
+            opts: this.getSep43SignOptions(scope, opts),
           },
         },
       });
@@ -282,8 +288,7 @@ export class MetaMaskStellarAdapter {
           method: 'signMessage',
           params: {
             message,
-            networkPassphrase: opts?.networkPassphrase ?? NETWORK_PASSPHRASE[scope],
-            address: opts?.address ?? this._address,
+            opts: this.getSep43SignOptions(scope, opts),
           },
         },
       });
@@ -394,11 +399,27 @@ export class MetaMaskStellarAdapter {
    */
   private async ensureScopeInSession(scope: Scope): Promise<void> {
     const session = await this._client.getSession();
-    const hasScope =
-      this._address && session?.sessionScopes[scope]?.accounts?.some((acc) => acc.includes(this._address as string));
-    if (!hasScope) {
+    const scopeObject = session?.sessionScopes[scope];
+    const hasAddress = this._address && scopeObject?.accounts?.some((acc) => acc.includes(this._address as string));
+    const hasSigningMethods = STELLAR_SIGNING_METHODS.every((method) => scopeObject?.methods?.includes(method));
+    if (!hasAddress || !hasSigningMethods) {
       await this.createSession(scope, this._address ? [this._address] : undefined);
     }
+  }
+
+  /**
+   * Builds the SEP-0043 `opts` object expected by the Stellar keyring handlers.
+   *
+   * @param scope - The Stellar scope used for the signing request.
+   * @param opts - Optional signing options from the dapp.
+   * @returns SEP-0043 signing options without undefined values.
+   */
+  private getSep43SignOptions(scope: Scope, opts?: Sep43SignOptions): Sep43SignOptions {
+    const address = opts?.address ?? this._address ?? undefined;
+    return {
+      networkPassphrase: opts?.networkPassphrase ?? NETWORK_PASSPHRASE[scope],
+      ...(address ? { address } : {}),
+    };
   }
 
   /**
@@ -431,7 +452,7 @@ export class MetaMaskStellarAdapter {
       optionalScopes: {
         [scope]: {
           accounts: addresses ? addresses.map((addr) => `${scope}:${addr}` as CaipAccountId) : [],
-          methods: [],
+          methods: [...STELLAR_SIGNING_METHODS],
           notifications: [],
         },
       },
