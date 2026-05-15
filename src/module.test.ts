@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NETWORK_NAME, NETWORK_PASSPHRASE, Scope } from './types.js';
+import { AdapterErrorCode, NETWORK_NAME, NETWORK_PASSPHRASE, Scope } from './types.js';
 
 const TEST_ADDRESS = 'GABC2DEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUV';
 
@@ -145,7 +145,7 @@ describe('MetaMaskModule', () => {
 
       const mod = new MetaMaskModule();
       await expect(mod.signAuthEntry('auth-xdr')).rejects.toEqual({
-        code: -3,
+        code: AdapterErrorCode.NOT_CONNECTED,
         message: 'MetaMask did not return a signed auth entry.',
       });
     });
@@ -198,6 +198,27 @@ describe('MetaMaskModule', () => {
       mod.onChange(callback);
 
       expect(mockAdapter.on).toHaveBeenCalledWith('accountsChanged', expect.any(Function));
+    });
+
+    it('invokes callback with address and network when account changes', async () => {
+      const mod = new MetaMaskModule();
+      const callback = vi.fn();
+      mod.onChange(callback);
+
+      const listener = mockAdapter.on.mock.calls.find(([event]) => event === 'accountsChanged')?.[1] as
+        | ((data: unknown) => void)
+        | undefined;
+      expect(listener).toBeDefined();
+
+      listener?.(TEST_ADDRESS);
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith({
+          address: TEST_ADDRESS,
+          network: NETWORK_NAME[Scope.PUBNET],
+          networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
+        });
+      });
     });
   });
 });

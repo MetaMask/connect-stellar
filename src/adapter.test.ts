@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NETWORK_NAME, NETWORK_PASSPHRASE, STELLAR_SIGNING_METHODS, Scope } from './types.js';
+import {
+  AdapterErrorCode,
+  NETWORK_NAME,
+  NETWORK_PASSPHRASE,
+  STELLAR_SIGNING_METHODS,
+  Scope,
+} from './types.js';
 
 // --- Mocks ---
 
 const TEST_ADDRESS = 'GABC2DEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUV';
-const _TEST_CAIP_ACCOUNT = `stellar:pubnet:${TEST_ADDRESS}` as const;
+const TESTNET_PASSPHRASE = 'Test SDF Network ; September 2015';
+const OTHER_ADDRESS = 'GNEWADDRESS1234567890123456789012345678901234567890123456';
 
 const mockRemoveListener = vi.fn();
 const mockClient = {
@@ -76,6 +83,10 @@ async function createAdapter() {
   return adapter;
 }
 
+function getNotificationHandler() {
+  return mockClient.onNotification.mock.calls.at(-1)?.[0] as ((data: unknown) => Promise<void>) | undefined;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorageMock.clear();
@@ -101,6 +112,35 @@ describe('MetaMaskStellarAdapter', () => {
       const adapter = await createAdapter();
       const { address } = await adapter.getAddress();
       expect(address).toBe(TEST_ADDRESS);
+    });
+
+    it('emits connect on auto-restore when session exists', async () => {
+      mockClient.getSession.mockResolvedValue(pubnetSession());
+      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
+
+      const connectSpy = vi.fn();
+      vi.resetModules();
+      vi.doMock('@metamask/multichain-api-client', () => ({
+        getDefaultTransport: vi.fn(() => ({})),
+        getMultichainClient: vi.fn(() => mockClient),
+        isMetamaskInstalled: vi.fn().mockResolvedValue(true),
+      }));
+
+      const { MetaMaskStellarAdapter } = await import('./adapter.js');
+      const adapter = new MetaMaskStellarAdapter();
+      adapter.on('connect', connectSpy);
+
+      await vi.waitFor(() => {
+        expect(connectSpy).toHaveBeenCalledWith(TEST_ADDRESS);
+      });
+    });
+
+    it('stays disconnected when restore getSession fails', async () => {
+      mockClient.getSession.mockRejectedValue(new Error('session unavailable'));
+      const adapter = await createAdapter();
+
+      const { isConnected } = await adapter.isConnected();
+      expect(isConnected).toBe(false);
     });
   });
 
@@ -141,7 +181,16 @@ describe('MetaMaskStellarAdapter', () => {
 
       expect(result.address).toBe('');
       expect(result.error).toBeDefined();
-      expect(result.error?.code).toBe(-1);
+      expect(result.error?.code).toBe(AdapterErrorCode.GENERIC);
+    });
+
+    it('returns error when createSession rejects', async () => {
+      mockClient.createSession.mockRejectedValue(new Error('user denied'));
+      const adapter = await createAdapter();
+      const result = await adapter.requestAccess();
+
+      expect(result.address).toBe('');
+      expect(result.error?.message).toBe('user denied');
     });
 
     it('emits connect event on success', async () => {
@@ -212,7 +261,7 @@ describe('MetaMaskStellarAdapter', () => {
       const result = await adapter.getAddress();
 
       expect(result.address).toBe('');
-      expect(result.error?.code).toBe(-3);
+      expect(result.error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
     });
 
     it('returns address when connected', async () => {
@@ -230,7 +279,7 @@ describe('MetaMaskStellarAdapter', () => {
       const result = await adapter.getNetwork();
 
       expect(result.network).toBe('');
-      expect(result.error?.code).toBe(-3);
+      expect(result.error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
     });
 
     it('returns network info when connected', async () => {
@@ -256,6 +305,15 @@ describe('MetaMaskStellarAdapter', () => {
 
       const result = await adapter.isAllowed();
       expect(result.isAllowed).toBe(true);
+    });
+
+    it('returns error when getSession throws', async () => {
+      mockClient.getSession.mockRejectedValue(new Error('rpc error'));
+      const adapter = await createAdapter();
+
+      const result = await adapter.isAllowed();
+      expect(result.isAllowed).toBe(false);
+      expect(result.error?.message).toBe('rpc error');
     });
   });
 
@@ -325,7 +383,53 @@ describe('MetaMaskStellarAdapter', () => {
     it('returns error when not connected', async () => {
       const adapter = await createAdapter();
       const result = await adapter.signTransaction('xdr');
-      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
+    });
+
+    it('returns unsupported network error for testnet passphrase', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const result = await adapter.signTransaction('xdr', { networkPassphrase: TESTNET_PASSPHRASE });
+      expect(result.error?.code).toBe(AdapterErrorCode.UNSUPPORTED_NETWORK);
+      expect(result.error?.message).toContain('Unknown network passphrase');
+      expect(mockClient.invokeMethod).not.toHaveBeenCalled();
+    });
+
+    it('preserves RPC error code when invokeMethod rejects', async () => {
+      mockClient.invokeMethod.mockRejectedValue({ code: 4001, message: 'User rejected' });
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const result = await adapter.signTransaction('xdr');
+      expect(result.error?.code).toBe(4001);
+      expect(result.error?.message).toBe('User rejected');
+    });
+
+    it('recreates session when signing methods are missing from session', async () => {
+      mockClient.invokeMethod.mockResolvedValue({
+        signedTxXdr: 'signed-xdr',
+        signerAddress: TEST_ADDRESS,
+      });
+
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+      mockClient.createSession.mockClear();
+
+      mockClient.getSession.mockResolvedValue({
+        sessionScopes: {
+          [Scope.PUBNET]: {
+            accounts: [`stellar:pubnet:${TEST_ADDRESS}`],
+            methods: ['signMessage'],
+            notifications: [],
+          },
+        },
+      });
+
+      const result = await adapter.signTransaction('xdr');
+      expect(result.signedTxXdr).toBe('signed-xdr');
+      expect(mockClient.createSession).toHaveBeenCalled();
+      expect(mockClient.invokeMethod).toHaveBeenCalled();
     });
   });
 
@@ -360,7 +464,16 @@ describe('MetaMaskStellarAdapter', () => {
     it('returns error when not connected', async () => {
       const adapter = await createAdapter();
       const result = await adapter.signAuthEntry('auth-entry-xdr');
-      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
+    });
+
+    it('returns unsupported network error for testnet passphrase', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const result = await adapter.signAuthEntry('auth-xdr', { networkPassphrase: TESTNET_PASSPHRASE });
+      expect(result.error?.code).toBe(AdapterErrorCode.UNSUPPORTED_NETWORK);
+      expect(mockClient.invokeMethod).not.toHaveBeenCalled();
     });
   });
 
@@ -395,7 +508,16 @@ describe('MetaMaskStellarAdapter', () => {
     it('returns error when not connected', async () => {
       const adapter = await createAdapter();
       const result = await adapter.signMessage('Hello');
-      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
+    });
+
+    it('returns unsupported network error for testnet passphrase', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const result = await adapter.signMessage('Hello', { networkPassphrase: TESTNET_PASSPHRASE });
+      expect(result.error?.code).toBe(AdapterErrorCode.UNSUPPORTED_NETWORK);
+      expect(mockClient.invokeMethod).not.toHaveBeenCalled();
     });
   });
 
@@ -417,42 +539,145 @@ describe('MetaMaskStellarAdapter', () => {
     });
   });
 
-  describe('handleSessionChangedEvent', () => {
-    it('updates address when session changes externally', async () => {
+  describe('accountsChanged', () => {
+    it('emits accountsChanged when session switches account externally', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
-      // Get the notification handler that was registered
-      const handler = mockClient.onNotification.mock.calls[0]?.[0];
-      expect(handler).toBeDefined();
+      const accountsChangedSpy = vi.fn();
+      adapter.on('accountsChanged', accountsChangedSpy);
 
-      const newAddress = 'GNEWADDRESS1234567890123456789012345678901234567890123456';
-      await handler({
+      const handler = getNotificationHandler();
+      await handler?.({
         method: 'wallet_sessionChanged',
         params: {
           sessionScopes: {
             [Scope.PUBNET]: {
-              accounts: [`stellar:pubnet:${newAddress}`],
+              accounts: [`stellar:pubnet:${OTHER_ADDRESS}`],
+            },
+          },
+        },
+      });
+
+      expect(accountsChangedSpy).toHaveBeenCalledWith(OTHER_ADDRESS);
+    });
+
+    it('keeps current address when it remains in the updated account list', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: {
+          sessionScopes: {
+            [Scope.PUBNET]: {
+              accounts: [`stellar:pubnet:${TEST_ADDRESS}`, `stellar:pubnet:${OTHER_ADDRESS}`],
             },
           },
         },
       });
 
       const { address } = await adapter.getAddress();
-      expect(address).toBe(newAddress);
+      expect(address).toBe(TEST_ADDRESS);
+    });
+  });
+
+  describe('handleSessionChangedEvent', () => {
+    it('updates address when session changes externally', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      expect(handler).toBeDefined();
+
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: {
+          sessionScopes: {
+            [Scope.PUBNET]: {
+              accounts: [`stellar:pubnet:${OTHER_ADDRESS}`],
+            },
+          },
+        },
+      });
+
+      const { address } = await adapter.getAddress();
+      expect(address).toBe(OTHER_ADDRESS);
     });
 
     it('disconnects when session is revoked externally', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
-      const handler = mockClient.onNotification.mock.calls[0]?.[0];
+      const handler = getNotificationHandler();
+      const disconnectSpy = vi.fn();
+      adapter.on('disconnect', disconnectSpy);
+      mockClient.revokeSession.mockClear();
+
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: { sessionScopes: {} },
+      });
+
+      expect(disconnectSpy).toHaveBeenCalled();
+      expect(mockClient.revokeSession).toHaveBeenCalledTimes(1);
+      const { isConnected } = await adapter.isConnected();
+      expect(isConnected).toBe(false);
+    });
+
+    it('disconnects when params are missing', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
       const disconnectSpy = vi.fn();
       adapter.on('disconnect', disconnectSpy);
 
-      await handler({
+      await handler?.({ method: 'wallet_sessionChanged' });
+
+      expect(disconnectSpy).toHaveBeenCalled();
+      const { isConnected } = await adapter.isConnected();
+      expect(isConnected).toBe(false);
+    });
+
+    it('disconnects when pubnet accounts are empty', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      const disconnectSpy = vi.fn();
+      adapter.on('disconnect', disconnectSpy);
+
+      await handler?.({
         method: 'wallet_sessionChanged',
-        params: { sessionScopes: {} },
+        params: {
+          sessionScopes: {
+            [Scope.PUBNET]: { accounts: [] },
+          },
+        },
+      });
+
+      expect(disconnectSpy).toHaveBeenCalled();
+    });
+
+    it('disconnects when session has only non-pubnet scope', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      const disconnectSpy = vi.fn();
+      adapter.on('disconnect', disconnectSpy);
+
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: {
+          sessionScopes: {
+            'stellar:testnet': {
+              accounts: [`stellar:testnet:${TEST_ADDRESS}`],
+            },
+          },
+        },
       });
 
       expect(disconnectSpy).toHaveBeenCalled();
@@ -462,8 +687,21 @@ describe('MetaMaskStellarAdapter', () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
-      const handler = mockClient.onNotification.mock.calls[0]?.[0];
-      await handler({ method: 'wallet_other', params: {} });
+      const handler = getNotificationHandler();
+      await handler?.({ method: 'wallet_other', params: {} });
+
+      const { isConnected } = await adapter.isConnected();
+      expect(isConnected).toBe(true);
+    });
+
+    it('ignores malformed notifications', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      await handler?.(null);
+      await handler?.(undefined);
+      await handler?.({});
 
       const { isConnected } = await adapter.isConnected();
       expect(isConnected).toBe(true);

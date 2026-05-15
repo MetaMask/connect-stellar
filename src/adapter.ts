@@ -8,6 +8,7 @@ import {
 } from '@metamask/multichain-api-client';
 import { metamaskIcon } from './icon.js';
 import {
+  AdapterErrorCode,
   NETWORK_NAME,
   NETWORK_PASSPHRASE,
   STELLAR_SIGNING_METHODS,
@@ -90,7 +91,7 @@ export class MetaMaskStellarAdapter {
         await this.createSession(Scope.PUBNET);
       }
       if (!this._address) {
-        return { address: '', error: { code: -1, message: 'No address selected' } };
+        return { address: '', error: { code: AdapterErrorCode.GENERIC, message: 'No address selected' } };
       }
       this._connected = true;
       this.startSessionListener();
@@ -134,7 +135,7 @@ export class MetaMaskStellarAdapter {
     if (!this._address) {
       return {
         address: '',
-        error: { code: -3, message: 'Not connected. Call requestAccess() first.' },
+        error: { code: AdapterErrorCode.NOT_CONNECTED, message: 'Not connected. Call requestAccess() first.' },
       };
     }
     return { address: this._address };
@@ -151,7 +152,7 @@ export class MetaMaskStellarAdapter {
       return {
         network: '',
         networkPassphrase: '',
-        error: { code: -3, message: 'Not connected. Call requestAccess() first.' },
+        error: { code: AdapterErrorCode.NOT_CONNECTED, message: 'Not connected. Call requestAccess() first.' },
       };
     }
     return {
@@ -386,7 +387,7 @@ export class MetaMaskStellarAdapter {
       return networkPassphraseToScope(networkPassphrase);
     }
     if (!this._scope) {
-      throw new Error('Not connected. Call requestAccess() first.');
+      throw { code: AdapterErrorCode.NOT_CONNECTED, message: 'Not connected. Call requestAccess() first.' };
     }
     return this._scope;
   }
@@ -595,12 +596,15 @@ export class MetaMaskStellarAdapter {
  */
 function toAdapterError(e: unknown): StellarAdapterError {
   if (e instanceof Error) {
-    return { code: -1, message: e.message };
+    if (e.message.startsWith('Unknown network passphrase')) {
+      return { code: AdapterErrorCode.UNSUPPORTED_NETWORK, message: e.message };
+    }
+    return { code: AdapterErrorCode.GENERIC, message: e.message };
   }
   if (typeof e === 'object' && e !== null && 'message' in e) {
     const obj = e as Record<string, unknown>;
-    const code = typeof obj.code === 'number' ? (obj.code as number) : -1;
+    const code = typeof obj.code === 'number' ? (obj.code as number) : AdapterErrorCode.GENERIC;
     return { code, message: String(obj.message) };
   }
-  return { code: -1, message: String(e) };
+  return { code: AdapterErrorCode.GENERIC, message: String(e) };
 }

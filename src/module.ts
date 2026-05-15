@@ -1,6 +1,7 @@
 import { type ModuleInterface, ModuleType } from '@creit.tech/stellar-wallets-kit';
 import { MetaMaskStellarAdapter } from './adapter.js';
 import { metamaskIcon } from './icon.js';
+import { AdapterErrorCode } from './types.js';
 
 /**
  * The unique product ID for the MetaMask module in the Stellar Wallets Kit.
@@ -114,7 +115,7 @@ export class MetaMaskModule implements ModuleInterface {
       throw result.error;
     }
     if (!result.signedAuthEntry) {
-      throw { code: -3, message: 'MetaMask did not return a signed auth entry.' };
+      throw { code: AdapterErrorCode.NOT_CONNECTED, message: 'MetaMask did not return a signed auth entry.' };
     }
     return { signedAuthEntry: result.signedAuthEntry, signerAddress: result.signerAddress };
   }
