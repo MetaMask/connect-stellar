@@ -220,5 +220,28 @@ describe('MetaMaskModule', () => {
         });
       });
     });
+
+    it('invokes callback with error when getNetwork rejects', async () => {
+      mockAdapter.getNetwork.mockRejectedValue(new Error('network unavailable'));
+
+      const mod = new MetaMaskModule();
+      const callback = vi.fn();
+      mod.onChange(callback);
+
+      const listener = mockAdapter.on.mock.calls.find(([event]) => event === 'accountsChanged')?.[1] as
+        | ((data: unknown) => void)
+        | undefined;
+
+      listener?.(TEST_ADDRESS);
+
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalledWith({
+          address: '',
+          network: '',
+          networkPassphrase: '',
+          error: { code: -1, message: 'network unavailable' },
+        });
+      });
+    });
   });
 });

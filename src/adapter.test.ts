@@ -431,6 +431,30 @@ describe('MetaMaskStellarAdapter', () => {
       expect(mockClient.createSession).toHaveBeenCalled();
       expect(mockClient.invokeMethod).toHaveBeenCalled();
     });
+
+    it('recreates session when connected address is not in session accounts', async () => {
+      mockClient.invokeMethod.mockResolvedValue({
+        signedTxXdr: 'signed-xdr',
+        signerAddress: TEST_ADDRESS,
+      });
+
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+      mockClient.createSession.mockClear();
+
+      mockClient.getSession.mockResolvedValue({
+        sessionScopes: {
+          [Scope.PUBNET]: {
+            accounts: [`stellar:pubnet:${OTHER_ADDRESS}`],
+            methods: [...STELLAR_SIGNING_METHODS],
+            notifications: [],
+          },
+        },
+      });
+
+      await adapter.signTransaction('xdr');
+      expect(mockClient.createSession).toHaveBeenCalled();
+    });
   });
 
   describe('signAuthEntry', () => {
@@ -536,6 +560,21 @@ describe('MetaMaskStellarAdapter', () => {
       mockClient.createSession.mockResolvedValue(pubnetSession());
       await adapter.requestAccess();
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('networkChanged', () => {
+    it('emits networkChanged when scope is first set on connect', async () => {
+      const adapter = await createAdapter();
+      const networkSpy = vi.fn();
+      adapter.on('networkChanged', networkSpy);
+
+      await adapter.requestAccess();
+
+      expect(networkSpy).toHaveBeenCalledWith({
+        network: NETWORK_NAME[Scope.PUBNET],
+        networkPassphrase: NETWORK_PASSPHRASE[Scope.PUBNET],
+      });
     });
   });
 
