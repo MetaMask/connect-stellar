@@ -239,7 +239,7 @@ describe('MetaMaskModule', () => {
           address: '',
           network: '',
           networkPassphrase: '',
-          error: { code: -1, message: 'network unavailable' },
+          error: { code: AdapterErrorCode.GENERIC, message: 'network unavailable' },
         });
       });
     });

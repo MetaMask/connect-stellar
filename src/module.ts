@@ -188,7 +188,12 @@ export class MetaMaskModule implements ModuleInterface {
         .getNetwork()
         .then(({ network, networkPassphrase }) => callback({ address, network, networkPassphrase }))
         .catch((error) =>
-          callback({ address: '', network: '', networkPassphrase: '', error: { code: -1, message: error.message } }),
+          callback({
+            address: '',
+            network: '',
+            networkPassphrase: '',
+            error: { code: AdapterErrorCode.GENERIC, message: error.message },
+          }),
         );
     });
   }
