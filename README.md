@@ -2,7 +2,7 @@
 
 MetaMask adapter for Stellar, implementing the [SEP-0043](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0043.md) wallet interface.
 
-Lets dapps sign Stellar transactions, Soroban auth entries, and arbitrary messages through MetaMask via the multichain API.
+Lets dapps sign Stellar transactions, Soroban auth entries, and arbitrary messages through MetaMask via the multichain API sdk.
 
 ## Installation
 
