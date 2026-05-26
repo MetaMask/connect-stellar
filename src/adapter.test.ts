@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  AdapterErrorCode,
-  NETWORK_NAME,
-  NETWORK_PASSPHRASE,
-  STELLAR_SIGNING_METHODS,
-  Scope,
-} from './types.js';
+import { AdapterErrorCode, NETWORK_NAME, NETWORK_PASSPHRASE, STELLAR_SIGNING_METHODS, Scope } from './types.js';
 
 // --- Mocks ---
 
