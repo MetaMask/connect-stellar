@@ -51,7 +51,7 @@
     "@metamask/multichain-api-client": "^0.11.0"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.15.3",
+    "@arethetypeswrong/cli": "0.15.3",
     "@biomejs/biome": "^1.8.3",
     "@creit.tech/stellar-wallets-kit": "^2.1.0",
     "@lavamoat/allow-scripts": "^3.0.4",
