@@ -44,33 +44,38 @@
     "lint:biome": "biome check",
     "lint:fix": "yarn lint:biome --fix && yarn format:fix && yarn lint:constraints --fix && yarn lint:dependencies && yarn lint:changelog",
     "prepack": "./scripts/prepack.sh",
-    "test": "vitest && attw --pack",
+    "test": "vitest && yarn test:attw",
+    "test:attw": "yarn build && yarn run attw --pack",
     "test:watch": "vitest --watch"
   },
   "dependencies": {
-    "@metamask/multichain-api-client": "^0.11.0"
+    "@metamask/multichain-api-client": "^0.12.0"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.15.3",
+    "@arethetypeswrong/cli": "0.15.3",
     "@biomejs/biome": "^1.8.3",
-    "@creit.tech/stellar-wallets-kit": "^2.1.0",
-    "@lavamoat/allow-scripts": "^3.0.4",
+    "@creit.tech/stellar-wallets-kit": "2.1.0",
+    "@lavamoat/allow-scripts": "3.3.2",
     "@lavamoat/preinstall-always-fail": "^2.0.0",
     "@metamask/auto-changelog": "^6.1.0",
     "@ts-bridge/cli": "^0.6.3",
     "@types/node": "^22.13.13",
-    "@vitest/coverage-istanbul": "^3.0.7",
+    "@vitest/coverage-istanbul": "3.1.2",
     "@vitest/eslint-plugin": "^1.1.4",
     "@yarnpkg/types": "^4.0.0-rc.52",
     "depcheck": "^1.4.3",
     "prettier": "^3.5.3",
     "ts-node": "^10.7.0",
-    "typedoc": "^0.26.11",
+    "typedoc": "^0.27.9",
     "typescript": "~5.7.3",
-    "vite": "^6.4.1",
-    "vitest": "^3.0.7"
+    "vite": "6.4.1",
+    "vitest": "3.1.2"
   },
   "packageManager": "yarn@4.1.1",
+  "resolutions": {
+    "fflate": "0.7.4",
+    "node-gyp": "11.2.0"
+  },
   "engines": {
     "node": "^18.20 || ^20.17 || >=22"
   },
@@ -86,10 +91,14 @@
       "vitest>vite-node>vite>esbuild": false,
       "vitest>vite>esbuild": false,
       "@creit.tech/stellar-wallets-kit>@hot-wallet/sdk>@near-js/crypto>secp256k1": false,
+      "@creit.tech/stellar-wallets-kit>@hot-wallet/sdk>@solana/web3.js>rpc-websockets>utf-8-validate": false,
       "@creit.tech/stellar-wallets-kit>@reown/appkit": false,
       "@creit.tech/stellar-wallets-kit>@reown/appkit>viem>ws>bufferutil": false,
       "@creit.tech/stellar-wallets-kit>@reown/appkit>viem>ws>utf-8-validate": false,
       "@creit.tech/stellar-wallets-kit>@trezor/connect-plugin-stellar>@stellar/stellar-sdk": false,
+      "@creit.tech/stellar-wallets-kit>@trezor/connect-web>@trezor/connect>@trezor/blockchain-link>@stellar/stellar-sdk": false,
+      "@creit.tech/stellar-wallets-kit>@trezor/connect-web>@trezor/connect>@trezor/blockchain-link-utils>@stellar/stellar-sdk": false,
+      "@creit.tech/stellar-wallets-kit>@trezor/connect-web>@trezor/connect>@trezor/blockchain-link>@trezor/blockchain-link-utils>@stellar/stellar-sdk": false,
       "@creit.tech/stellar-wallets-kit>@trezor/connect-web>@trezor/connect>@trezor/protobuf>protobufjs": false,
       "@creit.tech/stellar-wallets-kit>@trezor/connect-web>@trezor/connect>@trezor/transport>usb": false,
       "@creit.tech/stellar-wallets-kit>@trezor/connect-web>@trezor/connect>@trezor/utxo-lib>blake-hash": false,

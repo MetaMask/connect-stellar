@@ -66,6 +66,13 @@ export const NETWORK_NAME: Record<Scope, string> = {
   [Scope.PUBNET]: 'PUBLIC',
 };
 
+/** Stable error codes returned by adapter methods. */
+export const AdapterErrorCode = {
+  GENERIC: -1,
+  NOT_CONNECTED: -3,
+  UNSUPPORTED_NETWORK: -4,
+} as const;
+
 /**
  * Normalised error object returned by all SEP-0043 adapter methods.
  * Mirrors the Stellar Wallets Kit error shape so callers can handle errors uniformly.
@@ -73,7 +80,7 @@ export const NETWORK_NAME: Record<Scope, string> = {
 export interface StellarAdapterError {
   /** Human-readable description of the error. */
   message: string;
-  /** Numeric error code; `-1` for generic errors, `-3` for not-connected errors. */
+  /** Numeric error code; see {@link AdapterErrorCode}. */
   code: number;
   /** Optional extended error context (e.g. from the MetaMask RPC layer). */
   ext?: string[];
