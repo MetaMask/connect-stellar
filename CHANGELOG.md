@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0]
+
+### Uncategorized
+
+- Connect stellar v2 ([#8](https://github.com/MetaMask/connect-stellar/pull/8))
+- Fix Stellar signing method requests ([#7](https://github.com/MetaMask/connect-stellar/pull/7))
+
 ## [0.1.0]
 
 ### Added
@@ -17,5 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sessionChanged` event handling for real-time sync with MetaMask ([#2](https://github.com/MetaMask/connect-stellar/pull/2))
 - Exported SEP-0043 primitives (`Scope`, `NETWORK_PASSPHRASE`, `NETWORK_NAME`) for direct multichain API usage ([#2](https://github.com/MetaMask/connect-stellar/pull/2))
 
-[Unreleased]: https://github.com/MetaMask/connect-stellar/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/MetaMask/connect-stellar/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/MetaMask/connect-stellar/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MetaMask/connect-stellar/releases/tag/v0.1.0
