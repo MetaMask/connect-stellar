@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0]
 
-### Uncategorized
+### Added
 
 - Connect stellar v2 ([#8](https://github.com/MetaMask/connect-stellar/pull/8))
+
+### Fixed
+
 - Fix Stellar signing method requests ([#7](https://github.com/MetaMask/connect-stellar/pull/7))
 
 ## [0.1.0]
