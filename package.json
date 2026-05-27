@@ -54,13 +54,13 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.15.3",
     "@biomejs/biome": "^1.8.3",
-    "@creit.tech/stellar-wallets-kit": "^2.1.0",
+    "@creit.tech/stellar-wallets-kit": "2.1.0",
     "@lavamoat/allow-scripts": "^3.0.4",
     "@lavamoat/preinstall-always-fail": "^2.0.0",
     "@metamask/auto-changelog": "^6.1.0",
     "@ts-bridge/cli": "^0.6.3",
     "@types/node": "^22.13.13",
-    "@vitest/coverage-istanbul": "^3.0.7",
+    "@vitest/coverage-istanbul": "3.1.2",
     "@vitest/eslint-plugin": "^1.1.4",
     "@yarnpkg/types": "^4.0.0-rc.52",
     "depcheck": "^1.4.3",
@@ -68,10 +68,13 @@
     "ts-node": "^10.7.0",
     "typedoc": "^0.27.9",
     "typescript": "~5.7.3",
-    "vite": "^6.4.1",
-    "vitest": "^3.0.7"
+    "vite": "6.4.1",
+    "vitest": "3.1.2"
   },
   "packageManager": "yarn@4.1.1",
+  "resolutions": {
+    "fflate": "0.7.4"
+  },
   "engines": {
     "node": "^18.20 || ^20.17 || >=22"
   },
