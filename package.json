@@ -48,7 +48,7 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
-    "@metamask/multichain-api-client": "^0.11.0"
+    "@metamask/multichain-api-client": "^0.12.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.15.3",
