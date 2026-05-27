@@ -55,7 +55,7 @@
     "@arethetypeswrong/cli": "0.15.3",
     "@biomejs/biome": "^1.8.3",
     "@creit.tech/stellar-wallets-kit": "2.1.0",
-    "@lavamoat/allow-scripts": "^3.0.4",
+    "@lavamoat/allow-scripts": "3.3.2",
     "@lavamoat/preinstall-always-fail": "^2.0.0",
     "@metamask/auto-changelog": "^6.1.0",
     "@ts-bridge/cli": "^0.6.3",
@@ -73,7 +73,8 @@
   },
   "packageManager": "yarn@4.1.1",
   "resolutions": {
-    "fflate": "0.7.4"
+    "fflate": "0.7.4",
+    "node-gyp": "11.2.0"
   },
   "engines": {
     "node": "^18.20 || ^20.17 || >=22"
