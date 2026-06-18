@@ -54,13 +54,11 @@ import {
   NETWORK_PASSPHRASE,
   NETWORK_NAME,
   getAddressFromCaipAccountId,
-  networkPassphraseToScope,
 } from '@metamask/connect-stellar';
 import { getDefaultTransport, getMultichainClient } from '@metamask/multichain-api-client';
-import type { StellarRpc } from '@metamask/connect-stellar';
 
 const transport = getDefaultTransport();
-const client = getMultichainClient({ transport }).extendsRpcApi<StellarRpc>();
+const client = getMultichainClient({ transport })();
 
 // Create a session on PUBNET
 const session = await client.createSession({
