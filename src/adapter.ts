@@ -433,8 +433,7 @@ export class MetaMaskStellarAdapter {
       if (!existingSession) {
         return;
       }
-      const scope = this.restoreScope();
-      this.updateSession(existingSession, scope);
+      this.updateSession(existingSession);
     } catch (error) {
       console.warn('Failed to restore Stellar MetaMask session:', error);
     }
@@ -464,33 +463,34 @@ export class MetaMaskStellarAdapter {
 
   /**
    * Updates the adapter's internal state from a MetaMask `SessionData` object.
-   * Resolves the address by preferring the previously connected address, falling back to the
-   * first account in the PUBNET scope.
+   *
+   * The active address is always the **first** account of the scope. MetaMask sorts the
+   * accounts of every scope by last-selected before emitting `wallet_sessionChanged`, so
+   * `accounts[0]` is the account currently selected in the wallet. The previously connected
+   * address is deliberately *not* preferred: MetaMask keeps every permitted account in the
+   * list and only reorders it, so preferring the current address would make account switching
+   * a no-op whenever more than one account is permitted.
+   *
+   * This mirrors the `updateSession` of `@metamask/solana-wallet-standard` and
+   * `@metamask/bitcoin-wallet-standard`, and is the single code path used by session
+   * restoration, session creation and `wallet_sessionChanged`.
    *
    * @param session - The MetaMask session data to synchronise from.
-   * @param selectedScope - Unused, kept for internal call-site compatibility.
    */
-  private updateSession(session: SessionData, selectedScope?: Scope): void {
-    const scope = this.selectScopeWithPriority(session, selectedScope);
+  private updateSession(session: SessionData): void {
+    const scope = this.selectScopeWithPriority(session);
     if (!scope) {
-      this._address = null;
+      this.setAddress(null);
       return;
     }
 
-    const scopeAccounts = session?.sessionScopes[scope]?.accounts;
-    if (!scopeAccounts?.[0]) {
-      this._address = null;
+    const selectedAccountId = session?.sessionScopes[scope]?.accounts?.[0];
+    if (!selectedAccountId) {
+      this.setAddress(null);
       return;
     }
 
-    let addressToConnect: string;
-    if (this._address && scopeAccounts.includes(`${scope}:${this._address}` as CaipAccountId)) {
-      addressToConnect = this._address;
-    } else {
-      addressToConnect = getAddressFromCaipAccountId(scopeAccounts[0]);
-    }
-
-    this.setAddress(addressToConnect);
+    this.setAddress(getAddressFromCaipAccountId(selectedAccountId));
     this.setScope(scope);
   }
 
@@ -501,7 +501,7 @@ export class MetaMaskStellarAdapter {
    * @param session - The MetaMask session to inspect for available scopes.
    * @returns `Scope.PUBNET` when present in the session, or `undefined`.
    */
-  private selectScopeWithPriority(session: SessionData, _preferredScope?: Scope): Scope | undefined {
+  private selectScopeWithPriority(session: SessionData): Scope | undefined {
     const available = new Set(Object.keys(session?.sessionScopes ?? {}));
     return available.has(Scope.PUBNET) ? Scope.PUBNET : undefined;
   }
@@ -523,36 +523,17 @@ export class MetaMaskStellarAdapter {
   }
 
   /**
-   * Sets the active scope, persists it to `localStorage`, and emits `networkChanged` if the value changed.
+   * Sets the active scope and emits `networkChanged` if the value changed.
    *
    * @param scope - The Stellar network scope to activate.
    */
   private setScope(scope: Scope): void {
     if (this._scope !== scope) {
-      try {
-        localStorage.setItem('metamaskStellarAdapterScope', scope);
-      } catch {
-        // localStorage unavailable (SSR, service worker, etc.) — skip persistence.
-      }
       this._scope = scope;
       this.emit('networkChanged', {
         network: NETWORK_NAME[scope],
         networkPassphrase: NETWORK_PASSPHRASE[scope],
       });
-    }
-  }
-
-  /**
-   * Restores the previously persisted Stellar scope from `localStorage`.
-   *
-   * @returns The persisted `Scope`, or `undefined` if nothing was saved.
-   */
-  private restoreScope(): Scope | undefined {
-    try {
-      const saved = localStorage.getItem('metamaskStellarAdapterScope');
-      return saved ? (saved as Scope) : undefined;
-    } catch {
-      return undefined;
     }
   }
 
@@ -573,7 +554,7 @@ export class MetaMaskStellarAdapter {
       await this.disconnect();
       return;
     }
-    const scope = this.selectScopeWithPriority(session, this._scope);
+    const scope = this.selectScopeWithPriority(session);
     if (!scope) {
       await this.disconnect();
       return;
@@ -583,7 +564,7 @@ export class MetaMaskStellarAdapter {
       await this.disconnect();
       return;
     }
-    this.updateSession(session, scope);
+    this.updateSession(session);
   }
 }
 

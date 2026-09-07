@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Follow the account selected in MetaMask on `wallet_sessionChanged` instead of keeping the previously connected address, so switching account in the wallet is now reflected by the adapter
+
 ## [0.2.0]
 
 ### Added

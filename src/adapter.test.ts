@@ -101,8 +101,6 @@ describe('MetaMaskStellarAdapter', () => {
 
     it('restores session from existing MetaMask session', async () => {
       mockClient.getSession.mockResolvedValue(pubnetSession());
-      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
-
       const adapter = await createAdapter();
       const { address } = await adapter.getAddress();
       expect(address).toBe(TEST_ADDRESS);
@@ -110,8 +108,6 @@ describe('MetaMaskStellarAdapter', () => {
 
     it('emits connect on auto-restore when session exists', async () => {
       mockClient.getSession.mockResolvedValue(pubnetSession());
-      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
-
       const connectSpy = vi.fn();
       vi.resetModules();
       vi.doMock('@metamask/multichain-api-client', () => ({
@@ -158,8 +154,6 @@ describe('MetaMaskStellarAdapter', () => {
 
     it('skips createSession if already connected from restore', async () => {
       mockClient.getSession.mockResolvedValue(pubnetSession());
-      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
-
       const adapter = await createAdapter();
       mockClient.createSession.mockClear();
 
@@ -595,9 +589,40 @@ describe('MetaMaskStellarAdapter', () => {
       expect(accountsChangedSpy).toHaveBeenCalledWith(OTHER_ADDRESS);
     });
 
-    it('keeps current address when it remains in the updated account list', async () => {
+    // MetaMask keeps every permitted account in the scope and only reorders the list by
+    // last-selected, so switching account arrives as a re-sorted list that still contains
+    // the previously connected address. The adapter must follow accounts[0] regardless.
+    it('switches to the first account when MetaMask re-sorts the account list', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
+      expect((await adapter.getAddress()).address).toBe(TEST_ADDRESS);
+
+      const accountsChangedSpy = vi.fn();
+      adapter.on('accountsChanged', accountsChangedSpy);
+
+      const handler = getNotificationHandler();
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: {
+          sessionScopes: {
+            [Scope.PUBNET]: {
+              accounts: [`stellar:pubnet:${OTHER_ADDRESS}`, `stellar:pubnet:${TEST_ADDRESS}`],
+            },
+          },
+        },
+      });
+
+      const { address } = await adapter.getAddress();
+      expect(address).toBe(OTHER_ADDRESS);
+      expect(accountsChangedSpy).toHaveBeenCalledWith(OTHER_ADDRESS);
+    });
+
+    it('does not re-emit accountsChanged when the first account is unchanged', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const accountsChangedSpy = vi.fn();
+      adapter.on('accountsChanged', accountsChangedSpy);
 
       const handler = getNotificationHandler();
       await handler?.({
@@ -611,8 +636,8 @@ describe('MetaMaskStellarAdapter', () => {
         },
       });
 
-      const { address } = await adapter.getAddress();
-      expect(address).toBe(TEST_ADDRESS);
+      expect((await adapter.getAddress()).address).toBe(TEST_ADDRESS);
+      expect(accountsChangedSpy).not.toHaveBeenCalled();
     });
   });
 
