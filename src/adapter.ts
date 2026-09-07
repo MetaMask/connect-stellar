@@ -103,22 +103,33 @@ export class MetaMaskStellarAdapter {
   }
 
   /**
-   * Disconnects from MetaMask and revokes all Stellar scopes.
-   * Stops the `sessionChanged` listener before revoking so the revocation event
-   * does not trigger a redundant disconnect loop.
+   * Disconnects from MetaMask, optionally revoking the Stellar scopes.
    *
+   * Revoking is only appropriate when the dapp itself initiates the disconnection:
+   * `revokeSession` drops the whole CAIP-25 permission (including any EVM scope granted to
+   * the same origin) and tears the transport down, which also drops the `sessionChanged`
+   * listener. When MetaMask is the one telling us the Stellar scope is gone, we clear local
+   * state only — see `handleSessionChangedEvent`.
+   *
+   * @param options.revokeSession - Whether to revoke the Stellar scopes in MetaMask. Defaults to `true`.
    * @returns An empty object on success, or an error descriptor on failure.
    */
-  async disconnect(): Promise<{ error?: StellarAdapterError }> {
+  async disconnect(options: { revokeSession?: boolean } = {}): Promise<{ error?: StellarAdapterError }> {
+    const { revokeSession = true } = options;
     try {
+      const wasConnected = this._connected || !!this._address;
       this._address = null;
       this._scope = undefined;
       this._connected = false;
-      this.emit('disconnect', undefined);
-      // Stop the listener before revoking to avoid handling the resulting sessionChanged event.
-      this._removeSessionChangedListener?.();
-      this._removeSessionChangedListener = undefined;
-      await this._client.revokeSession({ scopes: [Scope.PUBNET] });
+      if (wasConnected) {
+        this.emit('disconnect', undefined);
+      }
+      if (revokeSession) {
+        // Stop the listener before revoking to avoid handling the resulting sessionChanged event.
+        this._removeSessionChangedListener?.();
+        this._removeSessionChangedListener = undefined;
+        await this._client.revokeSession({ scopes: [Scope.PUBNET] });
+      }
       return {};
     } catch (e: unknown) {
       return { error: toAdapterError(e) };
@@ -540,7 +551,13 @@ export class MetaMaskStellarAdapter {
   /**
    * Handles incoming `wallet_sessionChanged` notifications from MetaMask.
    * Keeps adapter state in sync when the session scope or accounts change externally.
-   * Calls `disconnect()` when the session is empty or revoked.
+   *
+   * When the Stellar scope is still present, state is refreshed from the session — including
+   * the "scope present but no accounts" case, which `updateSession` handles by clearing the
+   * address while leaving the session usable so a later `createSession` can re-populate it.
+   * When the scope is gone, we clear local state **without** revoking: the notification means
+   * MetaMask already dropped it, and revoking here would take any EVM scope of the same origin
+   * down with it and kill the notification listener for good.
    *
    * @param data - Raw notification payload from the MetaMask multichain client.
    */
@@ -550,18 +567,9 @@ export class MetaMaskStellarAdapter {
     }
 
     const session = (data as { params?: SessionData })?.params;
-    if (!session) {
-      await this.disconnect();
-      return;
-    }
-    const scope = this.selectScopeWithPriority(session);
-    if (!scope) {
-      await this.disconnect();
-      return;
-    }
-    const isEmpty = !((session?.sessionScopes?.[scope]?.accounts?.length ?? 0) > 0);
-    if (isEmpty) {
-      await this.disconnect();
+    const scope = session ? this.selectScopeWithPriority(session) : undefined;
+    if (!session || !scope) {
+      await this.disconnect({ revokeSession: false });
       return;
     }
     this.updateSession(session);

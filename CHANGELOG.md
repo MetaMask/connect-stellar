@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Follow the account selected in MetaMask on `wallet_sessionChanged` instead of keeping the previously connected address, so switching account in the wallet is now reflected by the adapter
+- Stop revoking the CAIP-25 session when MetaMask reports the Stellar scope was removed, which previously also dropped the EVM scopes of the same origin and permanently killed the `wallet_sessionChanged` listener
 
 ## [0.2.0]
 
