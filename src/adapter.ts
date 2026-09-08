@@ -103,15 +103,11 @@ export class MetaMaskStellarAdapter {
   }
 
   /**
-   * Disconnects from MetaMask, optionally revoking the Stellar scopes.
+   * Disconnects from MetaMask, revoking the Stellar scopes unless told otherwise.
+   * Revoking drops the whole CAIP-25 permission of the origin, so it is only appropriate when the
+   * dapp initiates the disconnection.
    *
-   * Revoking is only appropriate when the dapp itself initiates the disconnection:
-   * `revokeSession` drops the whole CAIP-25 permission (including any EVM scope granted to
-   * the same origin) and tears the transport down, which also drops the `sessionChanged`
-   * listener. When MetaMask is the one telling us the Stellar scope is gone, we clear local
-   * state only — see `handleSessionChangedEvent`.
-   *
-   * @param options.revokeSession - Whether to revoke the Stellar scopes in MetaMask. Defaults to `true`.
+   * @param options.revokeSession - Whether to revoke the Stellar scopes. Defaults to `true`.
    * @returns An empty object on success, or an error descriptor on failure.
    */
   async disconnect(options: { revokeSession?: boolean } = {}): Promise<{ error?: StellarAdapterError }> {
@@ -473,36 +469,42 @@ export class MetaMaskStellarAdapter {
   }
 
   /**
-   * Updates the adapter's internal state from a MetaMask `SessionData` object.
+   * Updates the session and the address to connect to.
+   * Only the `stellar:pubnet` scope is supported, and the address is always the first account of
+   * that scope: MetaMask sorts the accounts of a scope by last selected, so the first one is the
+   * account currently selected in the wallet.
    *
-   * The active address is always the **first** account of the scope. MetaMask sorts the
-   * accounts of every scope by last-selected before emitting `wallet_sessionChanged`, so
-   * `accounts[0]` is the account currently selected in the wallet. The previously connected
-   * address is deliberately *not* preferred: MetaMask keeps every permitted account in the
-   * list and only reorders it, so preferring the current address would make account switching
-   * a no-op whenever more than one account is permitted.
-   *
-   * This mirrors the `updateSession` of `@metamask/solana-wallet-standard` and
-   * `@metamask/bitcoin-wallet-standard`, and is the single code path used by session
-   * restoration, session creation and `wallet_sessionChanged`.
-   *
-   * @param session - The MetaMask session data to synchronise from.
+   * @param session - The session data containing available scopes and accounts
    */
   private updateSession(session: SessionData): void {
     const scope = this.selectScopeWithPriority(session);
+
+    // If no scope is available, don't disconnect so that we can create/update a new session
     if (!scope) {
-      this.setAddress(null);
+      this.clearSession();
       return;
     }
 
     const selectedAccountId = session?.sessionScopes[scope]?.accounts?.[0];
+
+    // In case the Stellar scope is available but without any accounts
+    // Could happen if the user already created a session using ethereum injected provider for example or the SDK
+    // Don't disconnect so that we can create/update a new session
     if (!selectedAccountId) {
-      this.setAddress(null);
+      this.clearSession();
       return;
     }
 
     this.setAddress(getAddressFromCaipAccountId(selectedAccountId));
     this.setScope(scope);
+  }
+
+  /**
+   * Clears the active address and scope without touching the MetaMask session.
+   */
+  private clearSession(): void {
+    this.setAddress(null);
+    this.setScope(undefined);
   }
 
   /**
@@ -536,43 +538,39 @@ export class MetaMaskStellarAdapter {
   /**
    * Sets the active scope and emits `networkChanged` if the value changed.
    *
-   * @param scope - The Stellar network scope to activate.
+   * @param scope - The Stellar network scope to activate, or `undefined` to clear it.
    */
-  private setScope(scope: Scope): void {
+  private setScope(scope: Scope | undefined): void {
     if (this._scope !== scope) {
       this._scope = scope;
-      this.emit('networkChanged', {
-        network: NETWORK_NAME[scope],
-        networkPassphrase: NETWORK_PASSPHRASE[scope],
-      });
+      if (scope) {
+        this.emit('networkChanged', {
+          network: NETWORK_NAME[scope],
+          networkPassphrase: NETWORK_PASSPHRASE[scope],
+        });
+      }
     }
   }
 
   /**
-   * Handles incoming `wallet_sessionChanged` notifications from MetaMask.
-   * Keeps adapter state in sync when the session scope or accounts change externally.
+   * Handles the wallet_sessionChanged event.
+   * Updates internal state to connected (with correct accountsChanged event) when the session has
+   * the Stellar scope, or to disconnected when it does not.
    *
-   * When the Stellar scope is still present, state is refreshed from the session — including
-   * the "scope present but no accounts" case, which `updateSession` handles by clearing the
-   * address while leaving the session usable so a later `createSession` can re-populate it.
-   * When the scope is gone, we clear local state **without** revoking: the notification means
-   * MetaMask already dropped it, and revoking here would take any EVM scope of the same origin
-   * down with it and kill the notification listener for good.
-   *
-   * @param data - Raw notification payload from the MetaMask multichain client.
+   * @param data - The event data
    */
   private async handleSessionChangedEvent(data: unknown): Promise<void> {
     if (!isSessionChangedEvent(data)) {
       return;
     }
 
-    const session = (data as { params?: SessionData })?.params;
-    const scope = session ? this.selectScopeWithPriority(session) : undefined;
-    if (!session || !scope) {
+    if (this.selectScopeWithPriority(data.params)) {
+      this.updateSession(data.params);
+    } else {
+      // An empty sessionChanged event means that the Stellar scope was revoked outside of the adapter.
+      // We don't revoke the session in this case to avoid side effects on EVM scopes
       await this.disconnect({ revokeSession: false });
-      return;
     }
-    this.updateSession(session);
   }
 }
 

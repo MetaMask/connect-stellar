@@ -1,3 +1,4 @@
+import type { SessionData } from '@metamask/multichain-api-client';
 import { NETWORK_PASSPHRASE, type Scope } from './types.js';
 
 /**
@@ -37,12 +38,14 @@ export function networkPassphraseToScope(networkPassphrase: string): Scope {
 }
 
 /**
- * Returns `true` when the raw MetaMask notification is a `sessionChanged` event.
- * Fired by the multichain API whenever the active session scope or accounts change.
+ * Checks if the given event is a session changed event.
  *
- * @param event - Raw notification payload from `MultichainApiClient.onNotification`.
- * @returns `true` if the payload's `method` field is `wallet_sessionChanged`.
+ * @param event - The event to check.
+ * @returns True if the event is a session changed event, false otherwise.
  */
-export function isSessionChangedEvent(event: unknown): boolean {
-  return (event as { method?: string })?.method === 'wallet_sessionChanged';
+export function isSessionChangedEvent(
+  event: unknown,
+): event is { method: 'wallet_sessionChanged'; params: SessionData } {
+  const { method, params } = (event ?? {}) as { method?: string; params?: unknown };
+  return method === 'wallet_sessionChanged' && typeof params === 'object' && params !== null;
 }
