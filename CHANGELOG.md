@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Follow the account selected in MetaMask on `wallet_sessionChanged` instead of keeping the previously connected address, so switching account in the wallet is now reflected by the adapter
 - Stop revoking the CAIP-25 session when MetaMask reports the Stellar scope was removed, which previously also dropped the EVM scopes of the same origin and permanently killed the `wallet_sessionChanged` listener
+- Clear the active scope alongside the address when the session no longer exposes a Stellar account, so `getNetwork()` no longer answers while the adapter is disconnected
+- Ignore `wallet_sessionChanged` notifications without a `params` object instead of treating them as an external revocation
 
 ## [0.2.0]
 

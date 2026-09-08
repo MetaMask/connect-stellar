@@ -713,24 +713,23 @@ describe('MetaMaskStellarAdapter', () => {
       expect((await adapter.isConnected()).isConnected).toBe(true);
     });
 
-    it('disconnects without revoking when params are missing', async () => {
+    it('ignores a notification without params', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
       const handler = getNotificationHandler();
       const disconnectSpy = vi.fn();
       adapter.on('disconnect', disconnectSpy);
-      mockClient.revokeSession.mockClear();
 
       await handler?.({ method: 'wallet_sessionChanged' });
 
-      expect(disconnectSpy).toHaveBeenCalled();
-      expect(mockClient.revokeSession).not.toHaveBeenCalled();
-      const { isConnected } = await adapter.isConnected();
-      expect(isConnected).toBe(false);
+      // A malformed notification must not mutate local state
+      expect(disconnectSpy).not.toHaveBeenCalled();
+      expect((await adapter.isConnected()).isConnected).toBe(true);
+      expect((await adapter.getAddress()).address).toBe(TEST_ADDRESS);
     });
 
-    it('clears the address but keeps the session when pubnet has no accounts', async () => {
+    it('clears address and scope but keeps the session when pubnet has no accounts', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
@@ -749,10 +748,13 @@ describe('MetaMaskStellarAdapter', () => {
       });
 
       // The scope is still granted, so this is not a disconnection: a later createSession
-      // can re-populate it. Same behaviour as the Solana and Bitcoin wallet standards.
+      // can re-populate it.
       expect(disconnectSpy).not.toHaveBeenCalled();
       expect(mockClient.revokeSession).not.toHaveBeenCalled();
       expect((await adapter.isConnected()).isConnected).toBe(false);
+      // The scope must be cleared too, otherwise getNetwork() would keep answering while
+      // the adapter has no address.
+      expect((await adapter.getNetwork()).error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
     });
 
     it('disconnects without revoking when session has only non-pubnet scope', async () => {
