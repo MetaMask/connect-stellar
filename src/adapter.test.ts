@@ -101,8 +101,6 @@ describe('MetaMaskStellarAdapter', () => {
 
     it('restores session from existing MetaMask session', async () => {
       mockClient.getSession.mockResolvedValue(pubnetSession());
-      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
-
       const adapter = await createAdapter();
       const { address } = await adapter.getAddress();
       expect(address).toBe(TEST_ADDRESS);
@@ -110,8 +108,6 @@ describe('MetaMaskStellarAdapter', () => {
 
     it('emits connect on auto-restore when session exists', async () => {
       mockClient.getSession.mockResolvedValue(pubnetSession());
-      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
-
       const connectSpy = vi.fn();
       vi.resetModules();
       vi.doMock('@metamask/multichain-api-client', () => ({
@@ -158,8 +154,6 @@ describe('MetaMaskStellarAdapter', () => {
 
     it('skips createSession if already connected from restore', async () => {
       mockClient.getSession.mockResolvedValue(pubnetSession());
-      localStorageMock.setItem('metamaskStellarAdapterScope', Scope.PUBNET);
-
       const adapter = await createAdapter();
       mockClient.createSession.mockClear();
 
@@ -595,9 +589,40 @@ describe('MetaMaskStellarAdapter', () => {
       expect(accountsChangedSpy).toHaveBeenCalledWith(OTHER_ADDRESS);
     });
 
-    it('keeps current address when it remains in the updated account list', async () => {
+    // MetaMask keeps every permitted account in the scope and only reorders the list by
+    // last-selected, so switching account arrives as a re-sorted list that still contains
+    // the previously connected address. The adapter must follow accounts[0] regardless.
+    it('switches to the first account when MetaMask re-sorts the account list', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
+      expect((await adapter.getAddress()).address).toBe(TEST_ADDRESS);
+
+      const accountsChangedSpy = vi.fn();
+      adapter.on('accountsChanged', accountsChangedSpy);
+
+      const handler = getNotificationHandler();
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: {
+          sessionScopes: {
+            [Scope.PUBNET]: {
+              accounts: [`stellar:pubnet:${OTHER_ADDRESS}`, `stellar:pubnet:${TEST_ADDRESS}`],
+            },
+          },
+        },
+      });
+
+      const { address } = await adapter.getAddress();
+      expect(address).toBe(OTHER_ADDRESS);
+      expect(accountsChangedSpy).toHaveBeenCalledWith(OTHER_ADDRESS);
+    });
+
+    it('does not re-emit accountsChanged when the first account is unchanged', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const accountsChangedSpy = vi.fn();
+      adapter.on('accountsChanged', accountsChangedSpy);
 
       const handler = getNotificationHandler();
       await handler?.({
@@ -611,8 +636,8 @@ describe('MetaMaskStellarAdapter', () => {
         },
       });
 
-      const { address } = await adapter.getAddress();
-      expect(address).toBe(TEST_ADDRESS);
+      expect((await adapter.getAddress()).address).toBe(TEST_ADDRESS);
+      expect(accountsChangedSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -639,7 +664,72 @@ describe('MetaMaskStellarAdapter', () => {
       expect(address).toBe(OTHER_ADDRESS);
     });
 
-    it('disconnects when session is revoked externally', async () => {
+    it('disconnects without revoking when the scope is revoked externally', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      const disconnectSpy = vi.fn();
+      adapter.on('disconnect', disconnectSpy);
+      mockClient.revokeSession.mockClear();
+      mockRemoveListener.mockClear();
+
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: { sessionScopes: {} },
+      });
+
+      expect(disconnectSpy).toHaveBeenCalled();
+      // MetaMask already dropped the scope: revoking would take the EVM scopes of the same
+      // origin down with it and tear down the notification listener.
+      expect(mockClient.revokeSession).not.toHaveBeenCalled();
+      expect(mockRemoveListener).not.toHaveBeenCalled();
+      const { isConnected } = await adapter.isConnected();
+      expect(isConnected).toBe(false);
+    });
+
+    it('keeps receiving events after an externally revoked scope', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: { sessionScopes: {} },
+      });
+      expect((await adapter.isConnected()).isConnected).toBe(false);
+
+      // The same listener must still be able to reconnect us when the scope comes back.
+      await handler?.({
+        method: 'wallet_sessionChanged',
+        params: {
+          sessionScopes: {
+            [Scope.PUBNET]: { accounts: [`stellar:pubnet:${OTHER_ADDRESS}`] },
+          },
+        },
+      });
+
+      expect((await adapter.getAddress()).address).toBe(OTHER_ADDRESS);
+      expect((await adapter.isConnected()).isConnected).toBe(true);
+    });
+
+    it('ignores a notification without params', async () => {
+      const adapter = await createAdapter();
+      await adapter.requestAccess();
+
+      const handler = getNotificationHandler();
+      const disconnectSpy = vi.fn();
+      adapter.on('disconnect', disconnectSpy);
+
+      await handler?.({ method: 'wallet_sessionChanged' });
+
+      // A malformed notification must not mutate local state
+      expect(disconnectSpy).not.toHaveBeenCalled();
+      expect((await adapter.isConnected()).isConnected).toBe(true);
+      expect((await adapter.getAddress()).address).toBe(TEST_ADDRESS);
+    });
+
+    it('clears address and scope but keeps the session when pubnet has no accounts', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
@@ -650,40 +740,6 @@ describe('MetaMaskStellarAdapter', () => {
 
       await handler?.({
         method: 'wallet_sessionChanged',
-        params: { sessionScopes: {} },
-      });
-
-      expect(disconnectSpy).toHaveBeenCalled();
-      expect(mockClient.revokeSession).toHaveBeenCalledTimes(1);
-      const { isConnected } = await adapter.isConnected();
-      expect(isConnected).toBe(false);
-    });
-
-    it('disconnects when params are missing', async () => {
-      const adapter = await createAdapter();
-      await adapter.requestAccess();
-
-      const handler = getNotificationHandler();
-      const disconnectSpy = vi.fn();
-      adapter.on('disconnect', disconnectSpy);
-
-      await handler?.({ method: 'wallet_sessionChanged' });
-
-      expect(disconnectSpy).toHaveBeenCalled();
-      const { isConnected } = await adapter.isConnected();
-      expect(isConnected).toBe(false);
-    });
-
-    it('disconnects when pubnet accounts are empty', async () => {
-      const adapter = await createAdapter();
-      await adapter.requestAccess();
-
-      const handler = getNotificationHandler();
-      const disconnectSpy = vi.fn();
-      adapter.on('disconnect', disconnectSpy);
-
-      await handler?.({
-        method: 'wallet_sessionChanged',
         params: {
           sessionScopes: {
             [Scope.PUBNET]: { accounts: [] },
@@ -691,16 +747,24 @@ describe('MetaMaskStellarAdapter', () => {
         },
       });
 
-      expect(disconnectSpy).toHaveBeenCalled();
+      // The scope is still granted, so this is not a disconnection: a later createSession
+      // can re-populate it.
+      expect(disconnectSpy).not.toHaveBeenCalled();
+      expect(mockClient.revokeSession).not.toHaveBeenCalled();
+      expect((await adapter.isConnected()).isConnected).toBe(false);
+      // The scope must be cleared too, otherwise getNetwork() would keep answering while
+      // the adapter has no address.
+      expect((await adapter.getNetwork()).error?.code).toBe(AdapterErrorCode.NOT_CONNECTED);
     });
 
-    it('disconnects when session has only non-pubnet scope', async () => {
+    it('disconnects without revoking when session has only non-pubnet scope', async () => {
       const adapter = await createAdapter();
       await adapter.requestAccess();
 
       const handler = getNotificationHandler();
       const disconnectSpy = vi.fn();
       adapter.on('disconnect', disconnectSpy);
+      mockClient.revokeSession.mockClear();
 
       await handler?.({
         method: 'wallet_sessionChanged',
@@ -714,6 +778,7 @@ describe('MetaMaskStellarAdapter', () => {
       });
 
       expect(disconnectSpy).toHaveBeenCalled();
+      expect(mockClient.revokeSession).not.toHaveBeenCalled();
     });
 
     it('ignores non-sessionChanged events', async () => {
