@@ -54,13 +54,11 @@ import {
   NETWORK_PASSPHRASE,
   NETWORK_NAME,
   getAddressFromCaipAccountId,
-  networkPassphraseToScope,
 } from '@metamask/connect-stellar';
 import { getDefaultTransport, getMultichainClient } from '@metamask/multichain-api-client';
-import type { StellarRpc } from '@metamask/connect-stellar';
 
 const transport = getDefaultTransport();
-const client = getMultichainClient({ transport }).extendsRpcApi<StellarRpc>();
+const client = getMultichainClient({ transport })();
 
 // Create a session on PUBNET
 const session = await client.createSession({
@@ -104,6 +102,60 @@ const kit = new StellarWalletsKit({
   selectedWalletId: METAMASK_ID,
 });
 ```
+
+### Keep the dapp address in sync
+
+Stellar Wallets Kit 2.1 does not forward the selected module's optional
+`onChange` callback. A dapp that needs to react immediately when the user
+changes accounts must subscribe to the currently selected module itself.
+
+Subscribe after every `WALLET_SELECTED` event. The callback is available on
+`MetaMaskModule`; modules that do not support account-change notifications do
+not expose `onChange` and are simply skipped.
+
+```typescript
+import { StellarWalletsKit } from '@creit-tech/stellar-wallets-kit/sdk';
+import { KitEventType, type ModuleInterface } from '@creit-tech/stellar-wallets-kit/types';
+
+const modulesListeningForChanges = new WeakSet<ModuleInterface>();
+
+function subscribeToSelectedWalletChanges(
+  setAddress: (address: string) => void,
+): void {
+  let selectedModule: ModuleInterface;
+
+  try {
+    selectedModule = StellarWalletsKit.selectedModule;
+  } catch {
+    // No wallet has been selected yet.
+    return;
+  }
+
+  if (!selectedModule.onChange || modulesListeningForChanges.has(selectedModule)) return;
+
+  modulesListeningForChanges.add(selectedModule);
+  selectedModule.onChange((event) => {
+    // onChange cannot be unsubscribed, so ignore events from old selections.
+    if (StellarWalletsKit.selectedModule !== selectedModule) return;
+    if (event.error || !event.address) return;
+
+    setAddress(event.address);
+  });
+}
+
+StellarWalletsKit.on(KitEventType.WALLET_SELECTED, () => {
+  subscribeToSelectedWalletChanges(setAddress);
+});
+
+// Also call it once after init if a wallet was already selected.
+subscribeToSelectedWalletChanges(setAddress);
+```
+
+The `onChange` event contains `address`, `network`, `networkPassphrase`, and an
+optional `error`. Account changes should update the dapp's active address; the
+dapp-selected network should remain unchanged. The kit's `onChange` API does
+not currently provide an unsubscribe function, so subscribe each module at
+most once and ignore events from modules that are no longer selected.
 
 ## Supported network
 

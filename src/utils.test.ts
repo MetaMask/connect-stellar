@@ -27,11 +27,17 @@ describe('networkPassphraseToScope', () => {
 
 describe('isSessionChangedEvent', () => {
   it('returns true for a wallet_sessionChanged event', () => {
-    expect(isSessionChangedEvent({ method: 'wallet_sessionChanged' })).toBe(true);
+    expect(isSessionChangedEvent({ method: 'wallet_sessionChanged', params: { sessionScopes: {} } })).toBe(true);
   });
 
   it('returns false for other events', () => {
-    expect(isSessionChangedEvent({ method: 'wallet_other' })).toBe(false);
+    expect(isSessionChangedEvent({ method: 'wallet_other', params: { sessionScopes: {} } })).toBe(false);
+  });
+
+  it('returns false when params is missing or not an object', () => {
+    expect(isSessionChangedEvent({ method: 'wallet_sessionChanged' })).toBe(false);
+    expect(isSessionChangedEvent({ method: 'wallet_sessionChanged', params: null })).toBe(false);
+    expect(isSessionChangedEvent({ method: 'wallet_sessionChanged', params: 'nope' })).toBe(false);
   });
 
   it('returns false for non-object values', () => {
