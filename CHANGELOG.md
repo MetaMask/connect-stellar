@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0]
+
+### Uncategorized
+
+- fix: Account switching ([#16](https://github.com/MetaMask/connect-stellar/pull/16))
+- chore: migrate npm publishing to trusted publishing ([#13](https://github.com/MetaMask/connect-stellar/pull/13))
+
 ### Fixed
 
 - Follow the account selected in MetaMask on `wallet_sessionChanged` instead of keeping the previously connected address, so switching account in the wallet is now reflected by the adapter
@@ -34,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sessionChanged` event handling for real-time sync with MetaMask ([#2](https://github.com/MetaMask/connect-stellar/pull/2))
 - Exported SEP-0043 primitives (`Scope`, `NETWORK_PASSPHRASE`, `NETWORK_NAME`) for direct multichain API usage ([#2](https://github.com/MetaMask/connect-stellar/pull/2))
 
-[Unreleased]: https://github.com/MetaMask/connect-stellar/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/MetaMask/connect-stellar/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/MetaMask/connect-stellar/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MetaMask/connect-stellar/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MetaMask/connect-stellar/releases/tag/v0.1.0
